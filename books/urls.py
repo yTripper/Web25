@@ -4,8 +4,13 @@ from . import views
 app_name = 'books'
 
 urlpatterns = [
+    # Главная страница приложения books
+    path('', views.index, name='index'),
+
+    # Страница полного списка книг
+    path('list/', views.book_list, name='book-list'),
+
     # Обычные URL-паттерны
-    path('', views.book_list, name='book-list'),
     path('book/<int:pk>/', views.book_detail, name='book-detail'),
     path('book/create/', views.book_create, name='book-create'),
     path('book/<int:pk>/edit/', views.book_edit, name='book-edit'),
@@ -24,7 +29,8 @@ urlpatterns = [
     re_path(r'^books/(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/$', views.book_list, name='book-list-by-day'),
     
     # Поиск по названию книги (слова, начинающиеся с определенных букв)
-    re_path(r'^books/search/(?P<query>[a-zA-Zа-яА-Я]+)/$', views.book_list, name='book-search'),
+    path('search/', views.book_search, name='book-search'),
+    re_path(r'^books/search/(?P<query>[a-zA-Zа-яА-Я]+)/$', views.book_list, name='book-search-by-query'),
     
     # Фильтрация по цене
     re_path(r'^books/price/(?P<min_price>\d+)-(?P<max_price>\d+)/$', views.book_list, name='book-price-range'),

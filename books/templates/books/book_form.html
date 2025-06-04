@@ -1,16 +1,251 @@
 {% extends 'base.html' %}
-{% load crispy_forms_tags %}
 
-{% block title %}{{ action }} книгу{% endblock %}
+{% block title %}{% if form.instance.pk %}Редактирование книги{% else %}Добавление книги{% endif %}{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1>{{ action }} книгу</h1>
-    <form method="post" enctype="multipart/form-data">
+<article>
+    <header>
+        <h1>{% if form.instance.pk %}Редактирование книги{% else %}Добавление книги{% endif %}</h1>
+    </header>
+
+    <form method="post" enctype="multipart/form-data" class="book-form">
         {% csrf_token %}
-        {{ form|crispy }}
-        <button type="submit" class="btn btn-primary">{{ action }}</button>
-        <a href="{% url 'books:book-list' %}" class="btn btn-secondary">Отмена</a>
+        
+        <div class="form-group">
+            <label for="{{ form.title.id_for_label }}">Название книги:</label>
+            {{ form.title }}
+            {% if form.title.errors %}
+                <div class="error-message" role="alert">
+                    {{ form.title.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.author.id_for_label }}">Автор:</label>
+            {{ form.author }}
+            {% if form.author.errors %}
+                <div class="error-message" role="alert">
+                    {{ form.author.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.genres.id_for_label }}">Жанры:</label>
+            {{ form.genres }}
+            {% if form.genres.errors %}
+                <div class="error-message" role="alert">
+                    {{ form.genres.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.description.id_for_label }}">Описание:</label>
+            {{ form.description }}
+            {% if form.description.errors %}
+                <div class="error-message" role="alert">
+                    {{ form.description.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.price.id_for_label }}">Цена:</label>
+            {{ form.price }}
+            {% if form.price.errors %}
+                <div class="error-message" role="alert">
+                    {{ form.price.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.status.id_for_label }}">Статус:</label>
+            {{ form.status }}
+            {% if form.status.errors %}
+                <div class="error-message" role="alert">
+                    {{ form.status.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        <fieldset>
+            <legend>Скидка</legend>
+            <div class="form-group">
+                <label for="{{ form.has_discount.id_for_label }}">
+                    {{ form.has_discount }}
+                    <span>Активна ли скидка</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.discount_percent.id_for_label }}">Процент скидки:</label>
+                {{ form.discount_percent }}
+                {% if form.discount_percent.errors %}
+                    <div class="error-message" role="alert">
+                        {{ form.discount_percent.errors }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.discount_start.id_for_label }}">Начало скидки:</label>
+                {{ form.discount_start }}
+                {% if form.discount_start.errors %}
+                    <div class="error-message" role="alert">
+                        {{ form.discount_start.errors }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.discount_end.id_for_label }}">Конец скидки:</label>
+                {{ form.discount_end }}
+                {% if form.discount_end.errors %}
+                    <div class="error-message" role="alert">
+                        {{ form.discount_end.errors }}
+                    </div>
+                {% endif %}
+            </div>
+        </fieldset>
+
+        <div class="form-group">
+            <label for="{{ form.ebook_file.id_for_label }}">Электронная версия книги:</label>
+            {{ form.ebook_file }}
+            {% if form.ebook_file.errors %}
+                <div class="error-message" role="alert">
+                    {{ form.ebook_file.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.book_url.id_for_label }}">URL страницы книги:</label>
+            {{ form.book_url }}
+            {% if form.book_url.errors %}
+                <div class="error-message" role="alert">
+                    {{ form.book_url.errors }}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                {% if form.instance.pk %}Сохранить изменения{% else %}Добавить книгу{% endif %}
+            </button>
+            <a href="{% url 'books:book-list' %}" class="btn btn-secondary">Отмена</a>
+        </div>
     </form>
-</div>
+</article>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .book-form {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: bold;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="number"],
+    .form-group input[type="url"],
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        padding: 0.5rem;
+        font-size: 1rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .form-group input[type="checkbox"] {
+        margin-right: 0.5rem;
+    }
+
+    fieldset {
+        border: 1px solid #ddd;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        border-radius: 4px;
+    }
+
+    legend {
+        font-weight: bold;
+        padding: 0 0.5rem;
+    }
+
+    .error-message {
+        color: #dc3545;
+        margin-top: 0.25rem;
+        font-size: 0.875rem;
+    }
+
+    .form-actions {
+        margin-top: 2rem;
+        display: flex;
+        gap: 1rem;
+    }
+
+    .btn {
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .btn-primary {
+        background: #4A90E2;
+        color: white;
+        border: none;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border: none;
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+    }
+
+    /* Responsive styles */
+    @media (max-width: 768px) {
+        .form-actions {
+            flex-direction: column;
+        }
+
+        .btn {
+            width: 100%;
+            text-align: center;
+        }
+    }
+
+    /* High contrast mode */
+    @media (prefers-contrast: high) {
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            border: 2px solid #000;
+        }
+
+        .error-message {
+            color: #000;
+            font-weight: bold;
+        }
+    }
+</style>
 {% endblock %} 

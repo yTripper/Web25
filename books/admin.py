@@ -10,14 +10,15 @@ from .models import (
 from django.urls import reverse
 from django.urls import path
 from django.http import HttpResponse
-from django.template.loader import render_to_string
-from weasyprint import HTML, CSS
-from django.template.loader import get_template
+from django.template.loader import render_to_string, get_template
 from django.conf import settings
 import os
 from .forms import BookForm
 from django import forms
 from django.utils import timezone
+import tempfile
+from io import BytesIO
+from weasyprint import HTML, CSS
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
@@ -177,7 +178,8 @@ class BookAdmin(admin.ModelAdmin):
                 return HttpResponse('Книга не найдена', status=404)
                 
             # Создаем HTML контент
-            html_string = render_to_string('books/book_pdf.html', {
+            template = get_template('books/book_pdf.html')
+            html_string = template.render({
                 'book': book,
                 'author': book.author,
                 'genres': list(book.genres.all()),
@@ -186,17 +188,16 @@ class BookAdmin(admin.ModelAdmin):
             
             # Создаем PDF с обработкой ошибок
             try:
-                html = HTML(string=html_string)
-                pdf = html.write_pdf()
+                # Создаем PDF
+                response = HttpResponse(content_type='application/pdf')
+                response['Content-Disposition'] = f'attachment; filename="{book.title}.pdf"'
+                
+                # Генерируем PDF
+                HTML(string=html_string).write_pdf(response)
+                return response
+                    
             except Exception as e:
                 return HttpResponse(f'Ошибка при создании PDF: {str(e)}', status=500)
-            
-            # Создаем ответ
-            response = HttpResponse(content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="{book.title}.pdf"'
-            response.write(pdf)
-            
-            return response
         except Exception as e:
             return HttpResponse(f'Произошла ошибка: {str(e)}', status=500)
 

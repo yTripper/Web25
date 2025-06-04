@@ -6,6 +6,22 @@
 <div class="container mt-4">
     <h1>Список книг</h1>
     
+    <!-- Форма поиска -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <form method="get" action="{% url 'books:book-search' %}" class="d-flex">
+                <input type="text" name="query" class="form-control me-2" placeholder="Поиск по названию книги..." value="{{ query|default:'' }}" required>
+                <button type="submit" class="btn btn-primary">Поиск</button>
+            </form>
+        </div>
+    </div>
+    
+    {% if query %}
+    <div class="alert alert-info">
+        Результаты поиска по запросу: "{{ query }}"
+    </div>
+    {% endif %}
+    
     {% if user.is_authenticated %}
     <div class="mb-3">
         <a href="{% url 'books:book-create' %}" class="btn btn-primary">Добавить книгу</a>

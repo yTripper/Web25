@@ -17,6 +17,44 @@ from datetime import timedelta
 # Импорты из utils
 from .utils import search_books, get_book_data, check_book_availability
 
+def index(request):
+    """
+    Представление для главной страницы с виджетами.
+    """
+    now = timezone.now()
+
+    # QuerySet для виджета "Новинки"
+    # Используем пользовательский менеджер, если он есть и корректно работает,
+    # иначе - прямой QuerySet
+    try:
+        # Попробуем использовать менеджер
+        new_books = Book.objects.get_new_books()[:10] # Получаем до 10 новинок
+    except AttributeError:
+        # Если менеджера нет или метод не найден, используем прямой QuerySet
+        thirty_days_ago = now - timedelta(days=30)
+        new_books = Book.objects.filter(created_at__gte=thirty_days_ago).order_by('-created_at')[:10]
+
+    # QuerySet для виджета "Популярные книги" (по среднему рейтингу, например)
+    # Используем annotate для расчета среднего рейтинга и order_by
+    popular_books = Book.objects.annotate(
+        avg_rating=Avg('reviews__rating')
+    ).exclude(avg_rating__isnull=True).order_by('-avg_rating')[:10] # Исключаем книги без отзывов и берем топ-10
+
+    # QuerySet для виджета "Книги со скидкой"
+    discounted_books = Book.objects.filter(
+        has_discount=True,
+        discount_start__lte=now,
+        discount_end__gte=now,
+        discount_percent__gt=0
+    ).order_by('-discount_percent')[:10] # Берем до 10 книг с самой большой скидкой
+
+    context = {
+        'new_books': new_books,
+        'popular_books': popular_books,
+        'discounted_books': discounted_books,
+    }
+    return render(request, 'books/index.html', context)
+
 def book_list(request):
     """
     Список книг с демонстрацией всех требуемых методов
@@ -515,3 +553,19 @@ def orm_demonstration_view(request):
         'book_stats': book_stats,
     }
     return render(request, 'books/orm_demonstration.html', context)
+
+def book_search(request):
+    """
+    Представление для поиска книг по названию
+    """
+    query = request.GET.get('query', '')
+    if query:
+        books = Book.objects.filter(title__icontains=query).select_related('author')
+    else:
+        books = Book.objects.none()
+    
+    context = {
+        'books': books,
+        'query': query,
+    }
+    return render(request, 'books/book_list.html', context)

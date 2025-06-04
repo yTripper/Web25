@@ -1,0 +1,124 @@
+{% extends 'base.html' %} {# Убедитесь, что путь к вашему базовому шаблону правильный #}
+{% load static %} {# Если используете статические файлы, убедитесь, что загружены #}
+
+{% block title %}Главная страница{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Добро пожаловать в Книжный магазин!</h1>
+
+    {# Виджет "Новинки" #}
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Новинки</h2>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for book in new_books %}
+                            <div class="col-md-3 mb-4">
+                                <div class="card h-100">
+                                    {# Место для обложки книги, если есть (пока нет в модели Book) #}
+                                    {# <img src="{{ book.cover.image.url }}" class="card-img-top" alt="{{ book.title }}" style="height: 200px; object-fit: cover;"> #}
+                                    <div class="card-body d-flex flex-column">
+                                        <h5 class="card-title">{{ book.title }}</h5>
+                                        <p class="card-text">Автор: {{ book.author.name }}</p>
+                                        <p class="card-text"><small class="text-muted">Добавлено: {{ book.created_at|date:"d.m.Y" }}</small></p>
+                                        <div class="mt-auto">
+                                            <a href="{% url 'books:book-detail' pk=book.pk %}" class="btn btn-primary btn-sm">Подробнее</a>
+                                            {# Кнопка "В избранное" (функционал может быть не реализован) #}
+                                            <button class="btn btn-outline-secondary btn-sm" type="button">В избранное</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="col"><p>Новинок пока нет.</p></div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="card-footer text-end">
+                    <a href="#" class="btn btn-outline-secondary btn-sm">Все новинки &rarr;</a> {# Ссылка пока ведет никуда #}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Виджет "Популярные книги" #}
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Популярные книги</h2>
+                </div>
+                <div class="card-body">
+                     <div class="row">
+                        {% for book in popular_books %}
+                            <div class="col-md-3 mb-4">
+                                <div class="card h-100">
+                                     {# Место для обложки #}
+                                     <div class="card-body d-flex flex-column">
+                                        <h5 class="card-title">{{ book.title }}</h5>
+                                        <p class="card-text">Автор: {{ book.author.name }}</p>
+                                        <p class="card-text">Рейтинг: {{ book.avg_rating|floatformat:1|default:"Нет оценок" }}</p> {# avg_rating из аннотации #}
+                                        <div class="mt-auto">
+                                            <a href="{% url 'books:book-detail' pk=book.pk %}" class="btn btn-primary btn-sm">Подробнее</a>
+                                            <button class="btn btn-outline-secondary btn-sm" type="button">В избранное</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="col"><p>Популярных книг пока нет.</p></div>
+                        {% endfor %}
+                    </div>
+                </div>
+                 <div class="card-footer text-end">
+                    <a href="#" class="btn btn-outline-secondary btn-sm">Все популярные &rarr;</a> {# Ссылка пока ведет никуда #}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Виджет "Книги со скидкой" #}
+     <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Книги со скидкой</h2>
+                </div>
+                <div class="card-body">
+                     <div class="row">
+                        {% for book in discounted_books %}
+                            <div class="col-md-3 mb-4">
+                                <div class="card h-100">
+                                     {# Место для обложки #}
+                                     <div class="card-body d-flex flex-column">
+                                        <h5 class="card-title">{{ book.title }}</h5>
+                                        <p class="card-text">Автор: {{ book.author.name }}</p>
+                                        <p class="card-text text-danger fw-bold">Скидка {{ book.discount_percent }}%!</p>
+                                        <p class="card-text">Цена: <s>{{ book.price }}₽</s> {{ book.current_price }}₽</p> {# current_price из @property в модели #}
+                                        <div class="mt-auto">
+                                            <a href="{% url 'books:book-detail' pk=book.pk %}" class="btn btn-primary btn-sm">Подробнее</a>
+                                            <button class="btn btn-outline-secondary btn-sm" type="button">В избранное</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="col"><p>Книг со скидкой пока нет.</p></div>
+                        {% endfor %}
+                    </div>
+                </div>
+                 <div class="card-footer text-end">
+                    <a href="#" class="btn btn-outline-secondary btn-sm">Все скидки &rarr;</a> {# Ссылка пока ведет никуда #}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Здесь можно добавить виджет поиска или другие элементы #}
+
+</div>
+{% endblock %} 

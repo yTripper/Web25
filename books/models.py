@@ -6,9 +6,12 @@ from django.urls import reverse
 from django.db.models import Avg, Count, Sum, F, ExpressionWrapper, DecimalField
 from django.template.loader import render_to_string
 from django.http import HttpResponse
-from weasyprint import HTML
 from django.conf import settings
 from decimal import Decimal
+import os
+from io import BytesIO
+from weasyprint import HTML, CSS
+from django.template.loader import get_template
 
 class BookManager(models.Manager):
     def get_new_books(self):
@@ -135,18 +138,25 @@ class Book(models.Model):
 
     def generate_pdf(self):
         """Генерирует PDF-документ с информацией о книге"""
-        html_string = render_to_string('books/book_pdf.html', {
+        template = get_template('books/book_pdf.html')
+        html_string = template.render({
             'book': self,
             'author': self.author,
             'genres': list(self.genres.all()),
             'current_price': self.current_price,
         })
         
-        response = HttpResponse(content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="{self.title}.pdf"'
-        
-        HTML(string=html_string).write_pdf(response)
-        return response
+        try:
+            # Создаем PDF
+            response = HttpResponse(content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{self.title}.pdf"'
+            
+            # Генерируем PDF
+            HTML(string=html_string).write_pdf(response)
+            return response
+                
+        except Exception as e:
+            return HttpResponse(f'Ошибка при создании PDF: {str(e)}', status=500)
 
 class Cover(models.Model):
     book = models.OneToOneField(Book, on_delete=models.CASCADE, verbose_name=_('Книга'),
