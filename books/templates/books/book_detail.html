@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ book.title }}{% endblock %}
+
+{% block content %}
+<div class="book-detail">
+    <h1>{{ book.title }}</h1>
+    
+    <div class="book-info">
+        <p><strong>Автор:</strong> {{ book.author.name }}</p>
+        <p><strong>Жанры:</strong> 
+            {% for genre in book.genres.all %}
+                {{ genre.name }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+        </p>
+        <p><strong>Описание:</strong> {{ book.description }}</p>
+        
+        <div class="price-info">
+            {% if is_discounted %}
+                <p class="original-price">Цена: {{ book.price }}₽</p>
+                <p class="discount-info">
+                    Скидка: {{ discount_percent }}% ({{ discount_amount }}₽)
+                </p>
+                <p class="current-price">Цена со скидкой: {{ current_price }}₽</p>
+            {% else %}
+                <p class="current-price">Цена: {{ book.price }}₽</p>
+            {% endif %}
+        </div>
+
+        <p><strong>Статус:</strong> {{ book.get_status_display }}</p>
+        {% if book.published_at %}
+            <p><strong>Дата публикации:</strong> {{ book.published_at|date:"d.m.Y H:i" }}</p>
+        {% endif %}
+    </div>
+
+    <div class="reviews">
+        <h2>Отзывы</h2>
+        <p>Средний рейтинг: {{ avg_rating|floatformat:1 }}/5</p>
+        
+        {% if reviews %}
+            {% for review in reviews %}
+                <div class="review">
+                    <p><strong>{{ review.user.username }}</strong> - {{ review.get_rating_display }}</p>
+                    {% if review.comment %}
+                        <p>{{ review.comment }}</p>
+                    {% endif %}
+                    <p class="review-date">{{ review.created_at|date:"d.m.Y H:i" }}</p>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>Пока нет отзывов</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

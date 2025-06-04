@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}Список книг{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Список книг</h1>
+    
+    {% if user.is_authenticated %}
+    <div class="mb-3">
+        <a href="{% url 'books:book-create' %}" class="btn btn-primary">Добавить книгу</a>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        {% for book in books %}
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ book.title }}</h5>
+                    <h6 class="card-subtitle mb-2 text-muted">{{ book.author.name }}</h6>
+                    <p class="card-text">{{ book.description|truncatewords:30 }}</p>
+                    <p class="card-text">
+                        <strong>Цена:</strong> {{ book.price }} руб.
+                        {% if book.discount_price %}
+                        <span class="text-danger">(Скидка: {{ book.discount_price }} руб.)</span>
+                        {% endif %}
+                    </p>
+                    <div class="btn-group">
+                        <a href="{% url 'books:book-detail' pk=book.pk %}" class="btn btn-info">Подробнее</a>
+                        {% if user.is_authenticated %}
+                        <a href="{% url 'books:book-edit' pk=book.pk %}" class="btn btn-warning">Редактировать</a>
+                        <a href="{% url 'books:book-delete' pk=book.pk %}" class="btn btn-danger">Удалить</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <p class="text-center">Книги не найдены</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %} 

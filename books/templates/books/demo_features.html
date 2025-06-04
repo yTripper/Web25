@@ -1,0 +1,481 @@
+{% extends 'base.html' %}
+
+{% block title %}Демонстрация функций Django ORM{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Демонстрация функций Django ORM</h1>
+
+    <!-- ===== ДЕМОНСТРАЦИЯ ManyToManyField с through ===== -->
+    <section class="mb-5">
+        <h2>1. ManyToManyField с параметром through</h2>
+        
+        <div class="alert alert-info">
+            <h5>Что это такое?</h5>
+            <p>ManyToManyField с параметром <code>through</code> позволяет использовать промежуточную модель для хранения дополнительной информации о связи между объектами.</p>
+        </div>
+
+        <!-- Демонстрация User-Role через through -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Пользователи и роли через UserRole (промежуточная модель)</h3>
+            </div>
+            <div class="card-body">
+                {% if sample_user %}
+                <h5>Пример пользователя: {{ sample_user.username }}</h5>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Роли через ManyToManyField:</h6>
+                        <ul class="list-group list-group-flush">
+                            {% for role in user_roles_through_m2m %}
+                            <li class="list-group-item">{{ role.name }}</li>
+                            {% empty %}
+                            <li class="list-group-item">Ролей нет</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Роли через промежуточную модель UserRole:</h6>
+                        <ul class="list-group list-group-flush">
+                            {% for user_role in user_roles_through_intermediate %}
+                            <li class="list-group-item">{{ user_role.role.name }} (дата: {{ user_role.created_at|date:"d.m.Y" }})</li>
+                            {% empty %}
+                            <li class="list-group-item">Ролей нет</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% else %}
+                <p>Пользователи не найдены</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Демонстрация Book-Genre через through -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Книги и жанры через BookGenre (промежуточная модель)</h3>
+            </div>
+            <div class="card-body">
+                {% if sample_book %}
+                <h5>Пример книги: {{ sample_book.title }}</h5>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Жанры через ManyToManyField:</h6>
+                        <ul class="list-group list-group-flush">
+                            {% for genre in book_genres_through_m2m %}
+                            <li class="list-group-item">{{ genre.name }}</li>
+                            {% empty %}
+                            <li class="list-group-item">Жанров нет</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Жанры через промежуточную модель BookGenre:</h6>
+                        <ul class="list-group list-group-flush">
+                            {% for book_genre in book_genres_through_intermediate %}
+                            <li class="list-group-item">{{ book_genre.genre.name }} (добавлен: {{ book_genre.created_at|date:"d.m.Y" }})</li>
+                            {% empty %}
+                            <li class="list-group-item">Жанров нет</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% else %}
+                <p>Книги не найдены</p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== ДЕМОНСТРАЦИЯ select_related() ===== -->
+    <section class="mb-5">
+        <h2>2. select_related() - оптимизация ForeignKey и OneToOne</h2>
+        
+        <div class="alert alert-info">
+            <h5>Что это такое?</h5>
+            <p><code>select_related()</code> выполняет JOIN в базе данных для ForeignKey и OneToOneField, что уменьшает количество запросов к БД.</p>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Книги с авторами (select_related('author'))</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in books_with_author|slice:":5" %}
+                    <li class="list-group-item">
+                        <strong>{{ book.title }}</strong>
+                        {% if book.author %}
+                         - Автор: {{ book.author.name }}
+                        {% else %}
+                         - Автор неизвестен
+                        {% endif %}
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Отзывы с пользователями и книгами (select_related('user', 'book', 'book__author'))</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for review in reviews_with_user_and_book|slice:":5" %}
+                    <li class="list-group-item">
+                        <strong>{{ review.user.username }}</strong> оценил книгу 
+                        "<strong>{{ review.book.title }}</strong>" 
+                        {% if review.book.author %}(автор: {{ review.book.author.name }}){% endif %}
+                        на {{ review.rating }}/5
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Отзывы не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== ДЕМОНСТРАЦИЯ prefetch_related() ===== -->
+    <section class="mb-5">
+        <h2>3. prefetch_related() - оптимизация ManyToMany и обратных связей</h2>
+        
+        <div class="alert alert-info">
+            <h5>Что это такое?</h5>
+            <p><code>prefetch_related()</code> выполняет отдельные запросы для связанных объектов и соединяет их в Python. Используется для ManyToManyField и обратных ForeignKey связей.</p>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Книги с отзывами (prefetch_related('reviews'))</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in books_with_reviews|slice:":3" %}
+                    <li class="list-group-item">
+                        <strong>{{ book.title }}</strong>
+                        <ul class="mt-2">
+                            {% for review in book.reviews.all|slice:":3" %}
+                            <li>{{ review.user.username }}: {{ review.rating }}/5</li>
+                            {% empty %}
+                            <li>Отзывов нет</li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Авторы с их книгами (prefetch_related('books'))</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for author in authors_with_books|slice:":3" %}
+                    <li class="list-group-item">
+                        <strong>{{ author.name }}</strong>
+                        <ul class="mt-2">
+                            {% for book in author.books.all|slice:":3" %}
+                            <li>{{ book.title }} ({{ book.price }}₽)</li>
+                            {% empty %}
+                            <li>Книг нет</li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Авторы не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Сложная оптимизация (select_related + prefetch_related + Prefetch)</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in optimized_books|slice:":3" %}
+                    <li class="list-group-item">
+                        <strong>{{ book.title }}</strong>
+                        {% if book.author %} - {{ book.author.name }}{% endif %}
+                        <br>
+                        <small class="text-muted">
+                            Отзывов: {{ book.reviews_count }}, 
+                            Рейтинг: {{ book.avg_rating|floatformat:1|default:"Нет" }}, 
+                            Жанров: {{ book.genre_count }}
+                        </small>
+                        <br>
+                        <small>
+                            Жанры: 
+                            {% for genre in book.genres.all %}
+                                {{ genre.name }}{% if not forloop.last %}, {% endif %}
+                            {% empty %}
+                                Без жанров
+                            {% endfor %}
+                        </small>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== ОСТАЛЬНЫЕ ДЕМОНСТРАЦИИ ===== -->
+
+    <!-- 4. Демонстрация filter() с __ -->
+    <section class="mb-5">
+        <h2>4. Использование filter() с __</h2>
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Книги по автору (author__name)</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in books_by_author %}
+                    <li class="list-group-item">
+                        {{ book.title }} - {{ book.author.name }}
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Книги по цене (price__gte)</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in books_by_price %}
+                    <li class="list-group-item">
+                        {{ book.title }} - {{ book.price }}₽
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- 5. Демонстрация exclude() -->
+    <section class="mb-5">
+        <h2>5. Использование exclude()</h2>
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Доступные книги (exclude status='out_of_stock')</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in available_books %}
+                    <li class="list-group-item">
+                        {{ book.title }} - {{ book.status }}
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Новые книги (exclude created_at__lt)</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in new_books %}
+                    <li class="list-group-item">
+                        {{ book.title }} - {{ book.created_at|date:"d.m.Y" }}
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6. Демонстрация order_by() -->
+    <section class="mb-5">
+        <h2>6. Использование order_by()</h2>
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Книги по возрастанию цены</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in books_by_price_asc %}
+                    <li class="list-group-item">
+                        {{ book.title }} - {{ book.price }}₽
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Книги по убыванию цены</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in books_by_price_desc %}
+                    <li class="list-group-item">
+                        {{ book.title }} - {{ book.price }}₽
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Книги по автору и названию</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in books_by_author_title %}
+                    <li class="list-group-item">
+                        {{ book.title }} - {{ book.author.name }}
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7. Демонстрация собственного менеджера -->
+    <section class="mb-5">
+        <h2>7. Использование собственного менеджера</h2>
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Новые книги (get_new_books)</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in new_books_manager %}
+                    <li class="list-group-item">
+                        {{ book.title }} - {{ book.created_at|date:"d.m.Y" }}
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3>Бестселлеры (get_bestsellers)</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in bestsellers %}
+                    <li class="list-group-item">
+                        {{ book.title }} - Продано: {{ book.total_sales }}
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Высоко оцененные книги (get_highly_rated)</h3>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for book in highly_rated %}
+                    <li class="list-group-item">
+                        {{ book.title }} - Рейтинг: {{ book.avg_rating|floatformat:1 }}
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item">Книги не найдены</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- 8. Демонстрация get_absolute_url -->
+    <section class="mb-5">
+        <h2>8. Использование get_absolute_url</h2>
+        <div class="card">
+            <div class="card-header">
+                <h3>URL первой книги</h3>
+            </div>
+            <div class="card-body">
+                {% if book_url %}
+                <p>URL: <a href="{{ book_url }}">{{ book_url }}</a></p>
+                {% else %}
+                <p>Книги не найдены</p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <!-- 9. Демонстрация агрегации и аннотации -->
+    <section class="mb-5">
+        <h2>9. Использование агрегации и аннотации</h2>
+        <div class="card">
+            <div class="card-header">
+                <h3>Статистика по книгам</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Название</th>
+                                <th>Количество отзывов</th>
+                                <th>Средний рейтинг</th>
+                                <th>Всего продано</th>
+                                <th>Категория цены</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for book in books_with_stats %}
+                            <tr>
+                                <td>{{ book.title }}</td>
+                                <td>{{ book.reviews_count }}</td>
+                                <td>{{ book.avg_rating|floatformat:1|default:"Нет оценок" }}</td>
+                                <td>{{ book.total_sales|default:"0" }}</td>
+                                <td>{{ book.price_category }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5">Книги не найдены</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %} 

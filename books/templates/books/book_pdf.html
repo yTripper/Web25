@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{{ book.title }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            line-height: 1.6;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .book-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .book-info {
+            margin-bottom: 20px;
+        }
+        .book-description {
+            margin-top: 30px;
+            text-align: justify;
+        }
+        .price {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-top: 20px;
+        }
+        .discount {
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="book-title">{{ book.title }}</div>
+        <div>Автор: {{ author.name }}</div>
+    </div>
+
+    <div class="book-info">
+        <p><strong>Жанры:</strong> {{ genres|join:", " }}</p>
+        <p><strong>Статус:</strong> {{ book.get_status_display }}</p>
+        {% if book.published_at %}
+        <p><strong>Дата публикации:</strong> {{ book.published_at|date:"d.m.Y" }}</p>
+        {% endif %}
+    </div>
+
+    <div class="book-description">
+        <h3>Описание:</h3>
+        {{ book.description|linebreaks }}
+    </div>
+
+    <div class="price">
+        {% if book.is_discount_active %}
+            <span style="text-decoration: line-through;">{{ book.price }}₽</span>
+            <span class="discount">{{ current_price }}₽</span>
+            <br>
+            <span class="discount">Скидка: {{ book.discount_percent }}%</span>
+        {% else %}
+            {{ book.price }}₽
+        {% endif %}
+    </div>
+</body>
+</html> 

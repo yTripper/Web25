@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ action }} книгу{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>{{ action }} книгу</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form|crispy }}
+        <button type="submit" class="btn btn-primary">{{ action }}</button>
+        <a href="{% url 'books:book-list' %}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %} 

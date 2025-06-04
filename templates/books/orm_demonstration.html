@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Демонстрация ORM</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; margin: 20px; }
+        h1, h2 { color: #333; }
+        pre { background-color: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .section { margin-bottom: 40px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .search-form { margin-bottom: 20px; }
+        .search-results ul { list-style: none; padding: 0; }
+        .search-results li { background-color: #e9e9e9; padding: 10px; margin-bottom: 5px; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Демонстрация Django ORM методов</h1>
+
+    <div class="section">
+        <h2>Поиск (__icontains, __contains)</h2>
+        <form method="get" class="search-form">
+            <input type="text" name="q" value="{{ query|default_if_none:'' }}" placeholder="Введите поисковый запрос">
+            <button type="submit">Искать</button>
+        </form>
+
+        {% if query %}
+            <h3>Результаты поиска для "{{ query }}"</h3>
+            {% if search_results %}
+                <div class="search-results">
+                    <ul>
+                        {% for book in search_results %}
+                            <li>{{ book.title }} (Автор: {{ book.author.name|default:"Неизвестен" }})</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% else %}
+                <p>Ничего не найдено.</p>
+            {% endif %}
+        {% else %}
+            <p>Введите запрос для поиска книг по заголовку (без учета регистра) или описанию (с учетом регистра).</p>
+        {% endif %}
+    </div>
+
+    <div class="section">
+        <h2>Получение данных (values(), values_list())</h2>
+        <h3>values() - Список словарей:</h3>
+        <pre>{{ book_data.books_dict|pprint }}</pre> {# pprint требует установки django-extensions или ручной реализации фильтра #}
+        {% comment %}
+           Если pprint не работает, можно отобразить так:
+           <ul>
+               {% for item in book_data.books_dict %}
+                   <li>{{ item }}</li>
+               {% endfor %}
+           </ul>
+        {% endcomment %}
+
+        <h3>values_list() - Список кортежей:</h3>
+         <pre>{{ book_data.books_list|pprint }}</pre>
+        {% comment %}
+            <ul>
+                {% for item in book_data.books_list %}
+                    <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+        {% endcomment %}
+
+        <h3>values_list(flat=True) - Плоский список заголовков:</h3>
+        <pre>{{ book_data.book_titles|pprint }}</pre>
+        {% comment %}
+             <ul>
+                 {% for item in book_data.book_titles %}
+                     <li>{{ item }}</li>
+                 {% endfor %}
+             </ul>
+        {% endcomment %}
+        <p><em>Примечание: values() возвращает QuerySet словарей, values_list() возвращает QuerySet кортежей. flat=True используется с values_list() для получения одного значения из каждого объекта в виде плоского списка.</em></p>
+    </div>
+
+    <div class="section">
+        <h2>Статистика (count(), exists())</h2>
+        <p>Количество доступных книг: <strong>{{ book_stats.available_books_count }}</strong></p>
+        <p>Есть ли книги дороже 1000: <strong>{% if book_stats.has_expensive_books %}Да{% else %}Нет{% endif %}</strong></p>
+        <p><em>Примечание: count() выполняет SQL-запрос COUNT. exists() возвращает True, если QuerySet содержит хотя бы один результат, и False в противном случае (обычно более эффективно для простой проверки наличия).</em></p>
+    </div>
+
+    {% comment %} Update и Delete не демонстрируются на этой странице {% endcomment %}
+
+</body>
+</html> 
