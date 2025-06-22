@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
 
 load_dotenv()
 
@@ -47,6 +49,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'django_filters',
+    'silk',
 ]
 
 MIDDLEWARE = [
@@ -58,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'silk.middleware.SilkyMiddleware',
 ]
 
 ROOT_URLCONF = 'bookstore.urls'
@@ -181,3 +185,10 @@ FILTERS_DEFAULT_LOOKUP_EXPR = 'icontains'
 LOGIN_REDIRECT_URL = 'books:index'
 LOGOUT_REDIRECT_URL = 'books:index'
 LOGIN_URL = '/accounts/login/'
+
+sentry_sdk.init(
+    dsn="https://1e0374dc8fc9620b3e69ab71dca09720@o4509543801290752.ingest.de.sentry.io/4509543805091920",
+    integrations=[DjangoIntegration()],
+    traces_sample_rate=1.0,
+    send_default_pii=True
+)

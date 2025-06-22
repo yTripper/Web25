@@ -1,9 +1,12 @@
 from django.db.models import Q
 from .models import Book, Author, Genre
+from typing import Any, Dict
 
-def search_books(query):
+def search_books(query: str) -> Any:
     """
     Демонстрация __icontains и __contains
+    :param query: поисковый запрос
+    :return: QuerySet книг
     """
     # __icontains - поиск без учета регистра
     books_by_title = Book.objects.filter(title__icontains=query)
@@ -13,9 +16,10 @@ def search_books(query):
     
     return books_by_title | books_by_description
 
-def get_book_data():
+def get_book_data() -> Dict[str, Any]:
     """
     Демонстрация values() и values_list()
+    :return: Словарь с данными о книгах
     """
     # values() - получение словарей с указанными полями
     books_dict = Book.objects.values('title', 'price', 'status')
@@ -47,9 +51,10 @@ def check_book_availability():
         'has_expensive_books': has_expensive_books
     }
 
-def update_book_status():
+def update_book_status() -> int:
     """
     Демонстрация update()
+    :return: Количество обновленных книг
     """
     # Обновление всех книг определенного автора
     updated_count = Book.objects.filter(
@@ -58,9 +63,10 @@ def update_book_status():
     
     return updated_count
 
-def delete_old_books():
+def delete_old_books() -> Any:
     """
     Демонстрация delete()
+    :return: Количество удалённых книг
     """
     # Удаление книг, которые не в наличии более года
     from django.utils import timezone

@@ -5,6 +5,7 @@ from crispy_forms.layout import Layout, Submit, Row, Column, Div, HTML
 from crispy_forms.bootstrap import TabHolder, Tab, FormActions
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from typing import Any, Dict
 
 class BookForm(forms.ModelForm):
     published_at = forms.DateTimeField(
@@ -40,7 +41,14 @@ class BookForm(forms.ModelForm):
             'ebook_file', 'published_at', 'stock_quantity'
         ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Инициализация формы с настройкой Crispy Forms и начальных значений.
+
+        Args:
+            *args: Позиционные аргументы.
+            **kwargs: Именованные аргументы.
+        """
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = True
@@ -135,7 +143,14 @@ class OrderForm(forms.ModelForm):
             'payment_method': forms.Select(choices=Order.PAYMENT_CHOICES),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Инициализация формы заказа с настройкой Crispy Forms.
+
+        Args:
+            *args: Позиционные аргументы.
+            **kwargs: Именованные аргументы.
+        """
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.form_tag = True

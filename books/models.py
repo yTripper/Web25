@@ -13,6 +13,7 @@ from io import BytesIO
 from weasyprint import HTML, CSS
 from django.template.loader import get_template
 from django.core.exceptions import ValidationError
+from typing import Any
 
 class BookManager(models.Manager):
     def get_new_books(self):
@@ -41,9 +42,19 @@ class User(AbstractUser):
         ordering = ['-date_joined']
 
     def __str__(self) -> str:
+        """
+        Возвращает строковое представление пользователя.
+        :return: Имя пользователя
+        """
         return str(self.username)
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
+        """
+        Возвращает абсолютный URL для пользователя.
+
+        Returns:
+            str: Абсолютный URL.
+        """
         return reverse('user-detail', kwargs={'pk': self.pk})
 
 class Author(models.Model):
@@ -61,7 +72,13 @@ class Author(models.Model):
     def __str__(self) -> str:
         return str(self.name)
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
+        """
+        Возвращает абсолютный URL для автора.
+
+        Returns:
+            str: Абсолютный URL.
+        """
         return reverse('author-detail', kwargs={'pk': self.pk})
 
 class Genre(models.Model):
@@ -76,7 +93,13 @@ class Genre(models.Model):
     def __str__(self) -> str:
         return str(self.name)
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
+        """
+        Возвращает абсолютный URL для жанра.
+
+        Returns:
+            str: Абсолютный URL.
+        """
         return reverse('genre-detail', kwargs={'pk': self.pk})
 
 class Book(models.Model):
@@ -113,10 +136,16 @@ class Book(models.Model):
     def __str__(self) -> str:
         return str(self.title)
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
+        """
+        Возвращает абсолютный URL для книги.
+
+        Returns:
+            str: Абсолютный URL.
+        """
         return reverse('books:book-detail', kwargs={'pk': self.pk})
 
-    def clean(self):
+    def clean(self) -> None:
         """Валидация полей модели"""
         super().clean()
         
@@ -135,14 +164,28 @@ class Book(models.Model):
         if self.status == 'out_of_stock' and self.stock_quantity > 0:
             raise ValidationError(_('Книга не может быть отсутствовать при наличии на складе'))
 
-    def check_availability(self, quantity=1):
-        """Проверка доступности книги на складе"""
+    def check_availability(self, quantity: int = 1) -> bool:
+        """
+        Проверяет доступность книги на складе в указанном количестве.
+
+        Args:
+            quantity (int): Требуемое количество.
+
+        Returns:
+            bool: True, если книга доступна, иначе False.
+        """
         if self.status != 'available':
             return False
         return self.stock_quantity >= quantity
 
     @property
-    def is_discount_active(self):
+    def is_discount_active(self) -> bool:
+        """
+        Проверяет, активна ли скидка в данный момент.
+
+        Returns:
+            bool: True, если скидка активна.
+        """
         if not self.has_discount or self.discount_percent == 0:
             return False
         now = timezone.now()
@@ -151,20 +194,37 @@ class Book(models.Model):
         return False
 
     @property
-    def current_price(self):
+    def current_price(self) -> Decimal:
+        """
+        Возвращает текущую цену с учетом скидки.
+
+        Returns:
+            Decimal: Текущая цена.
+        """
         if self.is_discount_active:
             discount_amount = self.price * (Decimal(str(self.discount_percent)) / Decimal('100'))
             return self.price - discount_amount
         return self.price
 
     @property
-    def discount_amount(self):
+    def discount_amount(self) -> Decimal:
+        """
+        Возвращает сумму скидки.
+
+        Returns:
+            Decimal: Сумма скидки.
+        """
         if self.is_discount_active:
             return self.price - self.current_price
         return Decimal('0')
 
-    def generate_pdf(self):
-        """Генерация PDF-файла с информацией о книге"""
+    def generate_pdf(self) -> Any:
+        """
+        Генерация PDF-файла с информацией о книге.
+
+        Returns:
+            HttpResponse or None: PDF-файл в виде HttpResponse или None в случае ошибки.
+        """
         try:
             # Создаем HTML-шаблон
             html_string = render_to_string('books/pdf_template.html', {
@@ -279,7 +339,13 @@ class Review(models.Model):
     def __str__(self) -> str:
         return f"Отзыв от {str(self.user)} на {str(self.book)}"
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
+        """
+        Возвращает абсолютный URL для отзыва.
+
+        Returns:
+            str: Абсолютный URL.
+        """
         return reverse('review-detail', kwargs={'pk': self.pk})
 
 class Cart(models.Model):
@@ -296,11 +362,22 @@ class Cart(models.Model):
     def __str__(self) -> str:
         return f"Корзина {str(self.user)}"
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
+        """
+        Возвращает абсолютный URL для корзины.
+
+        Returns:
+            str: Абсолютный URL.
+        """
         return reverse('cart-detail', kwargs={'pk': self.pk})
 
-    def get_total_price(self):
-        """Вычисляет общую стоимость корзины с учетом скидок"""
+    def get_total_price(self) -> Decimal:
+        """
+        Вычисляет общую стоимость корзины с учетом скидок.
+
+        Returns:
+            Decimal: Общая стоимость.
+        """
         return self.cart_items.aggregate(
             total=Sum(
                 ExpressionWrapper(

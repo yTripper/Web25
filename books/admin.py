@@ -19,6 +19,8 @@ from django.utils import timezone
 import tempfile
 from io import BytesIO
 from weasyprint import HTML, CSS
+from typing import Any, List
+from django.db.models import QuerySet
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
@@ -32,7 +34,16 @@ class UserAdmin(BaseUserAdmin):
     filter_horizontal = ('groups', 'user_permissions')
 
     @admin.display(description=_('Роли'))
-    def get_roles(self, obj):
+    def get_roles(self, obj: User) -> str:
+        """
+        Возвращает список ролей пользователя.
+
+        Args:
+            obj (User): Экземпляр пользователя.
+
+        Returns:
+            str: Список ролей через запятую или "Нет ролей".
+        """
         roles = [user_role.role.name for user_role in obj.user_roles.all()]
         if roles:
             return ", ".join(roles)
@@ -58,11 +69,29 @@ class AuthorAdmin(admin.ModelAdmin):
     )
 
     @admin.display(description=_('Количество книг'))
-    def get_books_count(self, obj):
+    def get_books_count(self, obj: Author) -> int:
+        """
+        Возвращает количество книг автора.
+
+        Args:
+            obj (Author): Экземпляр автора.
+
+        Returns:
+            int: Количество книг.
+        """
         return obj.books.count()
 
     @admin.display(description=_('Книги'))
-    def get_books_list(self, obj):
+    def get_books_list(self, obj: Author) -> str:
+        """
+        Возвращает список первых 3 книг автора.
+
+        Args:
+            obj (Author): Экземпляр автора.
+
+        Returns:
+            str: Список книг через запятую.
+        """
         books = obj.books.all()[:3]  # Показываем только первые 3 книги
         if books:
             book_list = ", ".join([book.title for book in books])
@@ -90,11 +119,29 @@ class GenreAdmin(admin.ModelAdmin):
     )
 
     @admin.display(description=_('Количество книг'))
-    def get_books_count(self, obj):
+    def get_books_count(self, obj: Genre) -> int:
+        """
+        Возвращает количество книг в жанре.
+
+        Args:
+            obj (Genre): Экземпляр жанра.
+
+        Returns:
+            int: Количество книг.
+        """
         return obj.book_genres.count()
 
     @admin.display(description=_('Книги'))
-    def get_books_list(self, obj):
+    def get_books_list(self, obj: Genre) -> str:
+        """
+        Возвращает список первых 3 книг жанра.
+
+        Args:
+            obj (Genre): Экземпляр жанра.
+
+        Returns:
+            str: Список книг через запятую.
+        """
         books = [bg.book.title for bg in obj.book_genres.all()[:3]]
         if books:
             book_list = ", ".join(books)
@@ -144,7 +191,14 @@ class BookAdmin(admin.ModelAdmin):
         }),
     )
 
-    def toggle_availability(self, request, queryset):
+    def toggle_availability(self, request: Any, queryset: QuerySet) -> None:
+        """
+        Переключает статус наличия выбранных книг.
+
+        Args:
+            request: Объект запроса.
+            queryset: QuerySet выбранных книг.
+        """
         for book in queryset:
             if book.status == 'available':
                 book.status = 'out_of_stock'
@@ -155,12 +209,27 @@ class BookAdmin(admin.ModelAdmin):
 
     actions = ['toggle_availability']
 
-    def get_pdf_link(self, obj):
+    def get_pdf_link(self, obj: Book) -> str:
+        """
+        Возвращает ссылку для скачивания PDF книги.
+
+        Args:
+            obj (Book): Экземпляр книги.
+
+        Returns:
+            str: HTML-ссылка для скачивания PDF.
+        """
         url = reverse('admin:book-pdf', args=[obj.id])
         return format_html('<a href="{}">Скачать PDF</a>', url)
     get_pdf_link.short_description = 'PDF'
 
-    def get_urls(self):
+    def get_urls(self) -> List[path]:
+        """
+        Возвращает дополнительные URL для админ-панели.
+
+        Returns:
+            List[path]: Список дополнительных URL-паттернов.
+        """
         urls = super().get_urls()
         custom_urls = [
             path(
@@ -171,7 +240,17 @@ class BookAdmin(admin.ModelAdmin):
         ]
         return custom_urls + urls
 
-    def generate_pdf(self, request, book_id):
+    def generate_pdf(self, request: Any, book_id: int) -> HttpResponse:
+        """
+        Генерирует PDF-файл для книги.
+
+        Args:
+            request: Объект запроса.
+            book_id (int): ID книги.
+
+        Returns:
+            HttpResponse: PDF-файл или сообщение об ошибке.
+        """
         try:
             book = self.get_object(request, book_id)
             if book is None:

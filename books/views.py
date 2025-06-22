@@ -1,28 +1,27 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, HttpRequest
 from .models import Book, Author, Genre, Review, Cart, CartItem, User, Role, UserRole, BookGenre, Cover, Order, OrderItem, Favorite
 from .forms import BookForm, ReviewForm, OrderForm
-from django.db.models import Avg, Prefetch, Count, Sum, F, Q, Case, When, Value, IntegerField, CharField
-from django.template.loader import render_to_string
-from django.conf import settings
-from django.views.decorators.http import require_POST
-from django.contrib.auth.decorators import login_required, permission_required
-from django.contrib.auth import logout, login
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import login
+from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
 from django.utils import timezone
-from datetime import timedelta
-from .filters import BookFilter
-from .serializers import BookSerializer, AuthorSerializer, ReviewSerializer, OrderSerializer
-from django.contrib.auth.forms import UserCreationForm
-from django_filters import FilterSet, CharFilter, NumberFilter, BooleanFilter
-from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Q, Count, Avg, Sum, Prefetch
+from django.core.paginator import Paginator
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
 from rest_framework import viewsets, permissions, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.urls import reverse_lazy
-from django.views.generic import CreateView
+from django_filters.rest_framework import DjangoFilterBackend
+from .serializers import BookSerializer, AuthorSerializer, GenreSerializer, ReviewSerializer, OrderSerializer
+from .filters import BookFilter
 from .permissions import IsOrderOwnerOrAdmin
+from typing import Any, Dict, List
+from django.db.models import QuerySet
 
 # Импорты из utils
 from .utils import search_books, get_book_data, check_book_availability
@@ -108,46 +107,35 @@ def book_list(request):
     }
     return render(request, 'books/book_list.html', context)
 
-def book_detail(request, pk):
+def book_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """
-    Детальная информация о книге с демонстрацией related_name и агрегации
+    Отображает детальную информацию о книге, включая отзывы.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        pk (int): Первичный ключ книги.
+
+    Returns:
+        HttpResponse: Страница с детальной информацией о книге.
     """
-    book = get_object_or_404(Book, pk=pk)
-    
-    # Пример использования related_name: book.reviews
-    reviews = book.reviews.all().select_related('user').order_by('-created_at')
-    
-    # Агрегация для статистики отзывов
-    review_stats = book.reviews.aggregate(
-        avg_rating=Avg('rating'),
-        max_rating=Max('rating'),
-        min_rating=Min('rating'),
-        total_reviews=Count('id')
+    book = get_object_or_404(
+        Book.objects.prefetch_related('reviews__user', 'genres'),
+        pk=pk
     )
-    
-    # Проверка активности скидки с использованием timezone
-    now = timezone.now()
-    is_discount_active = (
-        book.has_discount and 
-        book.discount_start and 
-        book.discount_end and
-        book.discount_start <= now <= book.discount_end
-    )
-    
-    context = {
-        'book': book,
-        'reviews': reviews,
-        'review_stats': review_stats,
-        'is_discounted': is_discount_active,
-        'current_price': book.current_price,
-        'discount_amount': book.discount_amount,
-        'time_until_discount_end': book.discount_end - now if is_discount_active else None,
-    }
-    return render(request, 'books/book_detail.html', context)
+    reviews = book.reviews.all()
+    return render(request, 'books/book_detail.html', {'book': book, 'reviews': reviews})
 
 @login_required
-def book_create(request):
-    """Создание новой книги с использованием timezone"""
+def book_create(request: HttpRequest) -> HttpResponse:
+    """
+    Создание новой книги с использованием timezone.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+
+    Returns:
+        HttpResponse: Форма для создания книги или редирект на страницу книги.
+    """
     if request.method == 'POST':
         form = BookForm(request.POST, request.FILES)  # Добавляем request.FILES для обработки файлов
         if form.is_valid():
@@ -162,8 +150,17 @@ def book_create(request):
     return render(request, 'books/book_form.html', {'form': form, 'action': 'Создать'})
 
 @login_required
-def book_edit(request, pk):
-    """Редактирование книги с использованием timezone"""
+def book_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Редактирование книги с использованием timezone.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        pk (int): Первичный ключ книги.
+
+    Returns:
+        HttpResponse: Форма для редактирования книги или редирект.
+    """
     book = get_object_or_404(Book, pk=pk)
     if request.method == 'POST':
         form = BookForm(request.POST, request.FILES, instance=book)  # Добавляем request.FILES
@@ -179,8 +176,17 @@ def book_edit(request, pk):
     return render(request, 'books/book_form.html', {'form': form, 'action': 'Редактировать'})
 
 @login_required
-def book_delete(request, pk):
-    """Удаление книги"""
+def book_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Удаление книги.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        pk (int): Первичный ключ книги.
+
+    Returns:
+        HttpResponse: Страница подтверждения удаления или редирект.
+    """
     book = get_object_or_404(Book, pk=pk)
     if request.method == 'POST':
         title = book.title
@@ -189,9 +195,16 @@ def book_delete(request, pk):
         return redirect('books:book-list')  # Редирект на список книг
     return render(request, 'books/book_confirm_delete.html', {'book': book})
 
-def author_detail(request, pk):
+def author_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """
-    Детальная информация об авторе с демонстрацией related_name и агрегации
+    Отображает детальную информацию об авторе и его книгах.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        pk (int): Первичный ключ автора.
+
+    Returns:
+        HttpResponse: Страница с информацией об авторе.
     """
     author = get_object_or_404(Author, pk=pk)
     
@@ -233,9 +246,16 @@ def author_detail(request, pk):
     }
     return render(request, 'books/author_detail.html', context)
 
-def cart_detail(request, pk):
+def cart_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """
-    Детальная информация о корзине с демонстрацией related_name и агрегации
+    Отображает содержимое корзины пользователя.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        pk (int): Первичный ключ корзины.
+
+    Returns:
+        HttpResponse: Страница с содержимым корзины.
     """
     cart = get_object_or_404(Cart, pk=pk)
     
@@ -274,9 +294,15 @@ def cart_detail(request, pk):
     }
     return render(request, 'books/cart_detail.html', context)
 
-def discount_books(request):
+def discount_books(request: HttpRequest) -> HttpResponse:
     """
-    Представление для книг со скидками с использованием timezone
+    Отображает список всех книг со скидками.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+
+    Returns:
+        HttpResponse: Страница с книгами со скидкой.
     """
     now = timezone.now()
     
@@ -492,9 +518,15 @@ def orm_demonstration_view(request):
     }
     return render(request, 'books/orm_demonstration.html', context)
 
-def book_search(request):
+def book_search(request: HttpRequest) -> HttpResponse:
     """
-    Представление для поиска книг по названию
+    Представление для поиска книг по названию.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+
+    Returns:
+        HttpResponse: Страница с результатами поиска.
     """
     query = request.GET.get('query', '')
     if query:
@@ -509,8 +541,17 @@ def book_search(request):
     return render(request, 'books/book_list.html', context)
 
 @login_required
-def add_to_cart(request, book_id):
-    """Добавление книги в корзину с проверкой наличия"""
+def add_to_cart(request: HttpRequest, book_id: int) -> HttpResponse:
+    """
+    Добавление книги в корзину с проверкой наличия.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        book_id (int): ID книги.
+
+    Returns:
+        HttpResponse: Редирект на страницу корзины или детали книги.
+    """
     book = get_object_or_404(Book, id=book_id)
     quantity = int(request.POST.get('quantity', 1))
     
@@ -539,8 +580,16 @@ def add_to_cart(request, book_id):
     return redirect('books:cart')
 
 @login_required
-def order_list(request):
-    """Список заказов с оптимизацией запросов"""
+def order_list(request: HttpRequest) -> HttpResponse:
+    """
+    Список заказов с оптимизацией запросов.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+
+    Returns:
+        HttpResponse: Страница со списком заказов.
+    """
     if request.user.is_staff:
         # Для администраторов показываем все заказы
         orders = Order.objects.select_related('user').prefetch_related(
@@ -558,8 +607,16 @@ def order_list(request):
     return render(request, 'books/order_list.html', context)
 
 @login_required
-def user_reviews(request):
-    """Список отзывов пользователя с оптимизацией запросов"""
+def user_reviews(request: HttpRequest) -> HttpResponse:
+    """
+    Список отзывов пользователя с оптимизацией запросов.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+
+    Returns:
+        HttpResponse: Страница со списком отзывов пользователя.
+    """
     reviews = Review.objects.select_related(
         'book', 'book__author'
     ).filter(user=request.user).order_by('-created_at')
@@ -570,8 +627,17 @@ def user_reviews(request):
     return render(request, 'books/user_reviews.html', context)
 
 @login_required
-def book_reviews(request, book_id):
-    """Список отзывов на книгу с оптимизацией запросов"""
+def book_reviews(request: HttpRequest, book_id: int) -> HttpResponse:
+    """
+    Список отзывов на книгу с оптимизацией запросов.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        book_id (int): ID книги.
+
+    Returns:
+        HttpResponse: Страница со списком отзывов на книгу.
+    """
     book = get_object_or_404(Book.objects.select_related('author'), id=book_id)
     reviews = Review.objects.select_related('user').filter(book=book).order_by('-created_at')
     
@@ -581,7 +647,16 @@ def book_reviews(request, book_id):
     }
     return render(request, 'books/book_reviews.html', context)
 
-def register(request):
+def register(request: HttpRequest) -> HttpResponse:
+    """
+    Регистрация нового пользователя.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+
+    Returns:
+        HttpResponse: Форма регистрации или редирект на страницу входа.
+    """
     if request.method == 'POST':
         form = UserCreationForm(request.POST)
         if form.is_valid():
@@ -605,7 +680,13 @@ class BookViewSet(viewsets.ModelViewSet):
     ordering_fields = ['price', 'created_at', 'title']
     ordering = ['-created_at']
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
+        """
+        Возвращает QuerySet с аннотациями для API.
+
+        Returns:
+            QuerySet: QuerySet с дополнительными полями.
+        """
         queryset = super().get_queryset()
         queryset = queryset.annotate(
             avg_rating=Avg('reviews__rating'),
@@ -615,7 +696,13 @@ class BookViewSet(viewsets.ModelViewSet):
         )
         return queryset
 
-    def get_serializer_context(self):
+    def get_serializer_context(self) -> dict:
+        """
+        Возвращает контекст для сериализатора.
+
+        Returns:
+            dict: Контекст с информацией об избранных книгах.
+        """
         context = super().get_serializer_context()
         if self.request.user.is_authenticated:
             favorites_books = self.request.user.favorites.values_list('book_id', flat=True)
@@ -640,7 +727,13 @@ class ReviewViewSet(viewsets.ModelViewSet):
     search_fields = ['comment']
     ordering = ['-created_at']
     
-    def perform_create(self, serializer):
+    def perform_create(self, serializer: ReviewSerializer) -> None:
+        """
+        Создает новый отзыв с привязкой к текущему пользователю.
+
+        Args:
+            serializer (ReviewSerializer): Сериализатор отзыва.
+        """
         serializer.save(user=self.request.user)
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -652,19 +745,40 @@ class OrderViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
     permission_classes = [permissions.IsAuthenticated, IsOrderOwnerOrAdmin]
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
+        """
+        Возвращает QuerySet заказов с учетом прав доступа.
+
+        Returns:
+            QuerySet: QuerySet заказов для текущего пользователя.
+        """
         queryset = super().get_queryset()
         if not self.request.user.is_staff and not self.request.user.roles.filter(name='admin').exists():
             # Обычные пользователи видят только свои заказы
             queryset = queryset.filter(user=self.request.user)
         return queryset
     
-    def perform_create(self, serializer):
+    def perform_create(self, serializer: OrderSerializer) -> None:
+        """
+        Создает новый заказ с привязкой к текущему пользователю.
+
+        Args:
+            serializer (OrderSerializer): Сериализатор заказа.
+        """
         serializer.save(user=self.request.user)
 
 @login_required
-def order_detail(request, pk):
-    """Детальный просмотр заказа с проверкой прав доступа"""
+def order_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Детальный просмотр заказа с проверкой прав доступа.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        pk (int): Первичный ключ заказа.
+
+    Returns:
+        HttpResponse: Страница с деталями заказа или редирект.
+    """
     order = get_object_or_404(Order, pk=pk)
     
     # Проверка прав доступа
