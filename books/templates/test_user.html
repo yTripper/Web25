@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест пользователя</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Тест отображения пользователя</h1>
+    
+    <div class="debug">
+        <h3>Информация о пользователе:</h3>
+        <p><strong>user:</strong> {{ user }}</p>
+        <p><strong>user.username:</strong> {{ user.username|default:"Не задано" }}</p>
+        <p><strong>user.is_authenticated:</strong> {{ user.is_authenticated }}</p>
+        <p><strong>user.id:</strong> {{ user.id|default:"Нет" }}</p>
+        <p><strong>user.is_anonymous:</strong> {{ user.is_anonymous }}</p>
+    </div>
+
+    <div class="debug">
+        <h3>Тест условий:</h3>
+        {% if user.is_authenticated %}
+            <p style="color: green;">✅ Пользователь АВТОРИЗОВАН</p>
+            <p>Привет, {{ user.username }}!</p>
+            <a href="/accounts/logout/" style="background: red; color: white; padding: 5px 10px; text-decoration: none;">Выйти</a>
+        {% else %}
+            <p style="color: red;">❌ Пользователь НЕ авторизован</p>
+            <a href="/accounts/login/" style="background: blue; color: white; padding: 5px 10px; text-decoration: none;">Войти</a>
+            <a href="/register/" style="background: green; color: white; padding: 5px 10px; text-decoration: none;">Регистрация</a>
+        {% endif %}
+    </div>
+
+    <div class="debug">
+        <h3>Роли пользователя:</h3>
+        {% if user.is_authenticated %}
+            {% for role in user.roles.all %}
+                <span style="background: blue; color: white; padding: 2px 5px; margin: 2px;">{{ role.name }}</span>
+            {% empty %}
+                <p>Ролей не назначено</p>
+            {% endfor %}
+        {% else %}
+            <p>Пользователь не авторизован</p>
+        {% endif %}
+    </div>
+
+    <hr>
+    <a href="{% url 'books:index' %}">← Вернуться на главную</a>
+</body>
+</html> 

@@ -1,4 +1,5 @@
 from django.urls import path, re_path
+from django.shortcuts import render
 from . import views
 
 app_name = 'books'
@@ -6,6 +7,9 @@ app_name = 'books'
 urlpatterns = [
     # Главная страница приложения books
     path('', views.index, name='index'),
+
+    # Тестовая страница для проверки пользователя
+    path('test-user/', lambda request: render(request, 'test_user.html'), name='test-user'),
 
     # Страница полного списка книг
     path('list/', views.book_list, name='book-list'),
@@ -30,11 +34,13 @@ urlpatterns = [
     
     # Поиск по названию книги (слова, начинающиеся с определенных букв)
     path('search/', views.book_search, name='book-search'),
-    re_path(r'^books/search/(?P<query>[a-zA-Zа-яА-Я]+)/$', views.book_list, name='book-search-by-query'),
+    re_path(r'^books/search/(?P<query>[a-zA-Zа-яА-Я]+)/$', views.book_search, name='book-search-by-query'),
     
     # Фильтрация по цене
     re_path(r'^books/price/(?P<min_price>\d+)-(?P<max_price>\d+)/$', views.book_list, name='book-price-range'),
     
     # Фильтрация по рейтингу
     re_path(r'^books/rating/(?P<rating>[1-5])/$', views.book_list, name='book-rating'),
+
+    path('register/', views.register, name='register'),
 ] 

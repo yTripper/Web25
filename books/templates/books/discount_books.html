@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block title %}Книги со скидками{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Книги со скидками</h1>
+    
+    <div class="row">
+        {% for book in books %}
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    {% if book.cover %}
+                        <img src="{{ book.cover.url }}" class="card-img-top" alt="{{ book.title }}">
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ book.title }}</h5>
+                        <p class="card-text">
+                            Автор: {{ book.author.name }}<br>
+                            Жанр: {{ book.genres.all|join:", " }}<br>
+                            Цена: {{ book.price }} ₽<br>
+                            Скидка: {{ book.discount_percentage }}%
+                        </p>
+                        <p class="text-danger">
+                            Цена со скидкой: {{ book.current_price }} ₽
+                        </p>
+                        <a href="{% url 'books:book-detail' book.pk %}" class="btn btn-primary">Подробнее</a>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <p class="text-center">В данный момент нет книг со скидками.</p>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %} 

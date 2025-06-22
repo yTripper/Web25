@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <!-- Фильтры -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Фильтры</h5>
+                </div>
+                <div class="card-body">
+                    <form method="get">
+                        {{ filter.form|crispy }}
+                        <button type="submit" class="btn btn-primary mt-3">Применить</button>
+                        <a href="{% url 'books:book-list' %}" class="btn btn-secondary mt-3">Сбросить</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Список книг -->
+        <div class="col-md-9">
+            <h2>Книги</h2>
+            <div class="row">
+                {% for book in books %}
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        {% if book.cover %}
+                        <img src="{{ book.cover.image.url }}" class="card-img-top" alt="{{ book.title }}">
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ book.title }}</h5>
+                            <p class="card-text">
+                                <strong>Автор:</strong> {{ book.author.name }}<br>
+                                <strong>Цена:</strong> {{ book.price }} ₽
+                                {% if book.has_discount %}
+                                <span class="badge bg-danger">Скидка {{ book.discount_percent }}%</span>
+                                {% endif %}
+                            </p>
+                            <a href="{% url 'books:book-detail' book.pk %}" class="btn btn-primary">Подробнее</a>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12">
+                    <p class="text-center">Книги не найдены</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

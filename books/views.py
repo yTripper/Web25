@@ -1,18 +1,28 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.http import HttpResponse, JsonResponse
-from .models import Book, Author, Genre, Review, Cart, CartItem, User, Role, UserRole, BookGenre, Cover
-from .forms import BookForm
-from django.db.models import Avg, Prefetch
+from .models import Book, Author, Genre, Review, Cart, CartItem, User, Role, UserRole, BookGenre, Cover, Order, OrderItem, Favorite
+from .forms import BookForm, ReviewForm, OrderForm
+from django.db.models import Avg, Prefetch, Count, Sum, F, Q, Case, When, Value, IntegerField, CharField
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required, permission_required
-from django.contrib.auth import logout
+from django.contrib.auth import logout, login
 from django.contrib import messages
-from django.db.models import Q, Count, Sum, F, ExpressionWrapper, DecimalField, Max, Min, Case, When, Value, IntegerField, CharField
 from django.utils import timezone
 from datetime import timedelta
+from .filters import BookFilter
+from .serializers import BookSerializer, AuthorSerializer, ReviewSerializer, OrderSerializer
+from django.contrib.auth.forms import UserCreationForm
+from django_filters import FilterSet, CharFilter, NumberFilter, BooleanFilter
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import viewsets, permissions, filters
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.urls import reverse_lazy
+from django.views.generic import CreateView
+from .permissions import IsOrderOwnerOrAdmin
 
 # Импорты из utils
 from .utils import search_books, get_book_data, check_book_availability
@@ -24,21 +34,16 @@ def index(request):
     now = timezone.now()
 
     # QuerySet для виджета "Новинки"
-    # Используем пользовательский менеджер, если он есть и корректно работает,
-    # иначе - прямой QuerySet
     try:
-        # Попробуем использовать менеджер
-        new_books = Book.objects.get_new_books()[:10] # Получаем до 10 новинок
+        new_books = Book.objects.get_new_books()[:8]
     except AttributeError:
-        # Если менеджера нет или метод не найден, используем прямой QuerySet
         thirty_days_ago = now - timedelta(days=30)
-        new_books = Book.objects.filter(created_at__gte=thirty_days_ago).order_by('-created_at')[:10]
+        new_books = Book.objects.filter(created_at__gte=thirty_days_ago).order_by('-created_at')[:8]
 
-    # QuerySet для виджета "Популярные книги" (по среднему рейтингу, например)
-    # Используем annotate для расчета среднего рейтинга и order_by
+    # QuerySet для виджета "Популярные книги"
     popular_books = Book.objects.annotate(
         avg_rating=Avg('reviews__rating')
-    ).exclude(avg_rating__isnull=True).order_by('-avg_rating')[:10] # Исключаем книги без отзывов и берем топ-10
+    ).exclude(avg_rating__isnull=True).order_by('-avg_rating')[:8]
 
     # QuerySet для виджета "Книги со скидкой"
     discounted_books = Book.objects.filter(
@@ -46,127 +51,60 @@ def index(request):
         discount_start__lte=now,
         discount_end__gte=now,
         discount_percent__gt=0
-    ).order_by('-discount_percent')[:10] # Берем до 10 книг с самой большой скидкой
+    ).order_by('-discount_percent')[:8]
+
+    # Отладочная информация
+    print(f"DEBUG: User: {request.user}")
+    print(f"DEBUG: User authenticated: {request.user.is_authenticated}")
+    print(f"DEBUG: User username: {getattr(request.user, 'username', 'No username')}")
 
     context = {
         'new_books': new_books,
         'popular_books': popular_books,
         'discounted_books': discounted_books,
+        'debug_user': request.user,  # Добавляем для отладки
+        'debug_authenticated': request.user.is_authenticated,
     }
     return render(request, 'books/index.html', context)
 
 def book_list(request):
     """
-    Список книг с демонстрацией всех требуемых методов
-    
-    Примеры использования timezone:
-    1. Фильтрация новых книг (созданных за последние 30 дней)
-    2. Проверка активных скидок по текущему времени
-    3. Сортировка по давности создания
+    Представление для отображения списка книг с фильтрацией, аннотациями и избранным
     """
+    books = Book.objects.all().select_related('author').prefetch_related('genres')
     
-    # ПРИМЕР 1: Использование timezone для фильтрации новых книг
-    thirty_days_ago = timezone.now() - timedelta(days=30)
-    seven_days_ago = timezone.now() - timedelta(days=7)
+    # Применяем фильтры
+    book_filter = BookFilter(request.GET, queryset=books)
     
-    # Базовый queryset с select_related для оптимизации
-    books = Book.objects.select_related('author').prefetch_related(
-        Prefetch('reviews', queryset=Review.objects.select_related('user'))
-    )
-
-    # ПРИМЕР filter() с __ (обращение к связанной таблице)
-    if request.GET.get('author'):
-        books = books.filter(author__name__icontains=request.GET.get('author'))
-    
-    if request.GET.get('genre'):
-        books = books.filter(genres__name__icontains=request.GET.get('genre'))
-    
-    # ПРИМЕР filter() с __ (метод поля модели)
-    if request.GET.get('min_price'):
-        books = books.filter(price__gte=request.GET.get('min_price'))
-    
-    if request.GET.get('max_price'):
-        books = books.filter(price__lte=request.GET.get('max_price'))
-
-    # ПРИМЕР 2: Использование timezone для активных скидок
-    now = timezone.now()
-    if request.GET.get('only_discounted'):
-        books = books.filter(
-            has_discount=True,
-            discount_start__lte=now,
-            discount_end__gte=now,
-            discount_percent__gt=0
-        )
-
-    # ПРИМЕР exclude() - исключаем книги
-    if request.GET.get('exclude_out_of_stock'):
-        books = books.exclude(status='out_of_stock')
-    
-    if request.GET.get('exclude_old'):
-        # Исключаем книги старше года
-        one_year_ago = timezone.now() - timedelta(days=365)
-        books = books.exclude(created_at__lt=one_year_ago)
-
-    # ПРИМЕР order_by() - различные варианты сортировки
-    sort_by = request.GET.get('sort', '-created_at')
-    if sort_by == 'price_asc':
-        books = books.order_by('price')
-    elif sort_by == 'price_desc':
-        books = books.order_by('-price')
-    elif sort_by == 'author':
-        books = books.order_by('author__name', 'title')
-    elif sort_by == 'rating':
-        books = books.order_by('-reviews__rating')
-    else:
-        books = books.order_by(sort_by)
-
-    # ПРИМЕР агрегации и аннотации (3 примера)
-    books = books.annotate(
-        # 1. Подсчет количества отзывов
-        reviews_count=Count('reviews'),
-        # 2. Средний рейтинг
+    # Добавляем аннотации
+    books = book_filter.qs.annotate(
+        # Средний рейтинг книги
         avg_rating=Avg('reviews__rating'),
-        # 3. Условная аннотация для популярности (числовые значения)
-        popularity_level=Case(
-            When(reviews__rating__gte=4.5, then=Value(3)),  # Высокая = 3
-            When(reviews__rating__gte=3.5, then=Value(2)),  # Средняя = 2
-            default=Value(1),  # Низкая = 1
-            output_field=IntegerField()
-        ),
-        # 4. Дополнительная аннотация с текстовыми значениями
+        # Количество отзывов
+        reviews_count=Count('reviews'),
+        # Количество продаж (через корзину)
+        total_sales=Sum('order_items__quantity'),
+        # Количество добавлений в избранное
+        favorites_count=Count('favorites'),
+        # Категория цены
         price_category=Case(
             When(price__gte=2000, then=Value('Дорогая')),
             When(price__gte=1000, then=Value('Средняя')),
             default=Value('Дешевая'),
             output_field=CharField(max_length=20)
+        ),
+        # Уровень популярности
+        popularity_level=Case(
+            When(avg_rating__gte=4.5, then=Value(3)),
+            When(avg_rating__gte=3.5, then=Value(2)),
+            default=Value(1),
+            output_field=IntegerField()
         )
     )
-
-    # Использование собственного менеджера
-    new_books = Book.objects.get_new_books()
-    bestsellers = Book.objects.get_bestsellers()
-    highly_rated = Book.objects.get_highly_rated()
-
-    # ПРИМЕР 3: Использование timezone для статистики по времени
-    today = timezone.now().date()
-    week_start = today - timedelta(days=today.weekday())
     
-    # Статистика по времени создания
-    time_stats = Book.objects.aggregate(
-        total_books=Count('id'),
-        books_this_week=Count('id', filter=Q(created_at__date__gte=week_start)),
-        books_last_30_days=Count('id', filter=Q(created_at__gte=thirty_days_ago)),
-        newest_book_date=Max('created_at'),
-        oldest_book_date=Min('created_at')
-    )
-
     context = {
         'books': books,
-        'new_books': new_books,
-        'bestsellers': bestsellers,
-        'highly_rated': highly_rated,
-        'time_stats': time_stats,
-        'current_time': timezone.now(),  # Для отображения текущего времени
+        'filter': book_filter,
     }
     return render(request, 'books/book_list.html', context)
 
@@ -569,3 +507,178 @@ def book_search(request):
         'query': query,
     }
     return render(request, 'books/book_list.html', context)
+
+@login_required
+def add_to_cart(request, book_id):
+    """Добавление книги в корзину с проверкой наличия"""
+    book = get_object_or_404(Book, id=book_id)
+    quantity = int(request.POST.get('quantity', 1))
+    
+    # Проверка наличия книги
+    is_available, message = book.check_stock(quantity)
+    if not is_available:
+        messages.error(request, message)
+        return redirect('books:book-detail', pk=book_id)
+    
+    cart, created = Cart.objects.get_or_create(user=request.user)
+    cart_item, created = CartItem.objects.get_or_create(cart=cart, book=book)
+    
+    if not created:
+        # Проверяем, не превысит ли новое количество доступное количество
+        new_quantity = cart_item.quantity + quantity
+        is_available, message = book.check_stock(new_quantity)
+        if not is_available:
+            messages.error(request, message)
+            return redirect('books:book-detail', pk=book_id)
+        cart_item.quantity = new_quantity
+    else:
+        cart_item.quantity = quantity
+    
+    cart_item.save()
+    messages.success(request, f'Книга "{book.title}" добавлена в корзину')
+    return redirect('books:cart')
+
+@login_required
+def order_list(request):
+    """Список заказов с оптимизацией запросов"""
+    if request.user.is_staff:
+        # Для администраторов показываем все заказы
+        orders = Order.objects.select_related('user').prefetch_related(
+            Prefetch('order_items', queryset=OrderItem.objects.select_related('book'))
+        ).order_by('-created_at')
+    else:
+        # Для обычных пользователей только их заказы
+        orders = Order.objects.select_related('user').prefetch_related(
+            Prefetch('order_items', queryset=OrderItem.objects.select_related('book'))
+        ).filter(user=request.user).order_by('-created_at')
+    
+    context = {
+        'orders': orders,
+    }
+    return render(request, 'books/order_list.html', context)
+
+@login_required
+def user_reviews(request):
+    """Список отзывов пользователя с оптимизацией запросов"""
+    reviews = Review.objects.select_related(
+        'book', 'book__author'
+    ).filter(user=request.user).order_by('-created_at')
+    
+    context = {
+        'reviews': reviews,
+    }
+    return render(request, 'books/user_reviews.html', context)
+
+@login_required
+def book_reviews(request, book_id):
+    """Список отзывов на книгу с оптимизацией запросов"""
+    book = get_object_or_404(Book.objects.select_related('author'), id=book_id)
+    reviews = Review.objects.select_related('user').filter(book=book).order_by('-created_at')
+    
+    context = {
+        'book': book,
+        'reviews': reviews,
+    }
+    return render(request, 'books/book_reviews.html', context)
+
+def register(request):
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            # Назначаем роль "Покупатель"
+            buyer_role = Role.objects.get(name='Покупатель')
+            UserRole.objects.create(user=user, role=buyer_role)
+            login(request, user)
+            return redirect('books:book-list')
+    else:
+        form = UserCreationForm()
+    return render(request, 'registration/register.html', {'form': form})
+
+class BookViewSet(viewsets.ModelViewSet):
+    """API для работы с книгами"""
+    queryset = Book.objects.all().select_related('author').prefetch_related('genres')
+    serializer_class = BookSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = BookFilter
+    search_fields = ['title', 'author__name', 'description']
+    ordering_fields = ['price', 'created_at', 'title']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        queryset = queryset.annotate(
+            avg_rating=Avg('reviews__rating'),
+            reviews_count=Count('reviews'),
+            total_sales=Sum('order_items__quantity'),
+            favorites_count=Count('favorites')
+        )
+        return queryset
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if self.request.user.is_authenticated:
+            favorites_books = self.request.user.favorites.values_list('book_id', flat=True)
+            context['favorites_books'] = list(favorites_books)
+        return context
+
+class AuthorViewSet(viewsets.ReadOnlyModelViewSet):
+    """API для работы с авторами (только чтение)"""
+    queryset = Author.objects.all().prefetch_related('books')
+    serializer_class = AuthorSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'bio']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+
+class ReviewViewSet(viewsets.ModelViewSet):
+    """API для работы с отзывами"""
+    queryset = Review.objects.all().select_related('user', 'book')
+    serializer_class = ReviewSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['book', 'rating', 'user']
+    search_fields = ['comment']
+    ordering = ['-created_at']
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+class OrderViewSet(viewsets.ModelViewSet):
+    """API для работы с заказами"""
+    queryset = Order.objects.all().select_related('user').prefetch_related('order_items__book')
+    serializer_class = OrderSerializer
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['status', 'payment_method']
+    ordering = ['-created_at']
+    permission_classes = [permissions.IsAuthenticated, IsOrderOwnerOrAdmin]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if not self.request.user.is_staff and not self.request.user.roles.filter(name='admin').exists():
+            # Обычные пользователи видят только свои заказы
+            queryset = queryset.filter(user=self.request.user)
+        return queryset
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+@login_required
+def order_detail(request, pk):
+    """Детальный просмотр заказа с проверкой прав доступа"""
+    order = get_object_or_404(Order, pk=pk)
+    
+    # Проверка прав доступа
+    if not request.user.is_staff and not request.user.roles.filter(name='admin').exists():
+        if order.user != request.user:
+            messages.error(request, 'У вас нет прав для просмотра этого заказа')
+            return redirect('order-list')
+    
+    # Оптимизация запросов
+    order = Order.objects.select_related('user').prefetch_related(
+        Prefetch('order_items', queryset=OrderItem.objects.select_related('book'))
+    ).get(pk=pk)
+    
+    context = {
+        'order': order,
+    }
+    return render(request, 'books/order_detail.html', context)

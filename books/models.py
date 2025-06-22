@@ -12,6 +12,7 @@ import os
 from io import BytesIO
 from weasyprint import HTML, CSS
 from django.template.loader import get_template
+from django.core.exceptions import ValidationError
 
 class BookManager(models.Manager):
     def get_new_books(self):
@@ -79,6 +80,8 @@ class Genre(models.Model):
         return reverse('genre-detail', kwargs={'pk': self.pk})
 
 class Book(models.Model):
+    stock_quantity = models.PositiveIntegerField(default=0, verbose_name=_('Количество на складе'))
+
     STATUS_CHOICES = [
         ('available', 'В наличии'),
         ('out_of_stock', 'Нет в наличии'),
@@ -100,7 +103,6 @@ class Book(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Дата создания'))
     updated_at = models.DateTimeField(auto_now=True, verbose_name=_('Дата обновления'))
     published_at = models.DateTimeField(null=True, blank=True, verbose_name=_('Дата публикации'))
-
     objects = BookManager()
 
     class Meta:
@@ -113,6 +115,31 @@ class Book(models.Model):
 
     def get_absolute_url(self):
         return reverse('books:book-detail', kwargs={'pk': self.pk})
+
+    def clean(self):
+        """Валидация полей модели"""
+        super().clean()
+        
+        # Валидация скидок
+        if self.has_discount:
+            if self.discount_percent == 0:
+                raise ValidationError(_('Процент скидки должен быть больше 0'))
+            if self.discount_percent > 100:
+                raise ValidationError(_('Процент скидки не может быть больше 100'))
+            if self.discount_start and self.discount_end and self.discount_start >= self.discount_end:
+                raise ValidationError(_('Дата начала скидки должна быть раньше даты окончания'))
+        
+        # Валидация статуса и количества
+        if self.status == 'available' and self.stock_quantity == 0:
+            raise ValidationError(_('Книга не может быть в наличии при нулевом количестве'))
+        if self.status == 'out_of_stock' and self.stock_quantity > 0:
+            raise ValidationError(_('Книга не может быть отсутствовать при наличии на складе'))
+
+    def check_availability(self, quantity=1):
+        """Проверка доступности книги на складе"""
+        if self.status != 'available':
+            return False
+        return self.stock_quantity >= quantity
 
     @property
     def is_discount_active(self):
@@ -137,26 +164,26 @@ class Book(models.Model):
         return Decimal('0')
 
     def generate_pdf(self):
-        """Генерирует PDF-документ с информацией о книге"""
-        template = get_template('books/book_pdf.html')
-        html_string = template.render({
-            'book': self,
-            'author': self.author,
-            'genres': list(self.genres.all()),
-            'current_price': self.current_price,
-        })
-        
+        """Генерация PDF-файла с информацией о книге"""
         try:
-            # Создаем PDF
+            # Создаем HTML-шаблон
+            html_string = render_to_string('books/pdf_template.html', {
+                'book': self,
+                'reviews': self.reviews.all().select_related('user'),
+                'genres': self.genres.all(),
+            })
+            
+            # Генерируем PDF
             response = HttpResponse(content_type='application/pdf')
             response['Content-Disposition'] = f'attachment; filename="{self.title}.pdf"'
             
-            # Генерируем PDF
+            # Конвертируем HTML в PDF
             HTML(string=html_string).write_pdf(response)
             return response
-                
+            
         except Exception as e:
-            return HttpResponse(f'Ошибка при создании PDF: {str(e)}', status=500)
+            print(f"Ошибка при генерации PDF: {str(e)}")
+            return None
 
 class Cover(models.Model):
     book = models.OneToOneField(Book, on_delete=models.CASCADE, verbose_name=_('Книга'),
@@ -302,3 +329,79 @@ class CartItem(models.Model):
 
     def get_absolute_url(self):
         return reverse('cart-item-detail', kwargs={'pk': self.pk})
+
+class Order(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'В обработке'),
+        ('processing', 'Обрабатывается'),
+        ('shipped', 'Отправлен'),
+        ('delivered', 'Доставлен'),
+        ('cancelled', 'Отменен'),
+    ]
+
+    PAYMENT_CHOICES = [
+        ('card', 'Банковская карта'),
+        ('cash', 'Наличные при получении'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders', verbose_name=_('Пользователь'))
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name=_('Статус'))
+    shipping_address = models.TextField(verbose_name=_('Адрес доставки'))
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES, verbose_name=_('Способ оплаты'))
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Общая сумма'))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Дата создания'))
+    updated_at = models.DateTimeField(auto_now=True, verbose_name=_('Дата обновления'))
+
+    def clean(self):
+        # Валидация адреса доставки
+        import re
+        address_pattern = r'^[а-яА-ЯёЁ\s]+,\s*д\.\s*\d+,\s*(?:кв\.\s*\d+)?,\s*\d{6}$'
+        if not re.match(address_pattern, self.shipping_address):
+            raise ValidationError(_('Адрес должен содержать улицу, номер дома и почтовый индекс в формате: "Улица, д. 1, кв. 1, 123456"'))
+
+        # Валидация суммы заказа
+        if self.total_amount < 500:
+            raise ValidationError(_('Минимальная сумма заказа должна быть не менее 500 рублей'))
+        if self.total_amount > 100000:
+            raise ValidationError(_('Максимальная сумма заказа не может превышать 100,000 рублей'))
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_items', verbose_name=_('Заказ'))
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='order_items', verbose_name=_('Книга'))
+    quantity = models.PositiveIntegerField(verbose_name=_('Количество'))
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Цена'))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Дата создания'))
+
+    class Meta:
+        verbose_name = _('Элемент заказа')
+        verbose_name_plural = _('Элементы заказа')
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f"{str(self.book)} в заказе {str(self.order)}"
+
+    def save(self, *args, **kwargs):
+        # Обновляем количество книг на складе
+        if not self.pk:  # Если это новый объект
+            self.book.stock_quantity -= self.quantity
+            self.book.save()
+        super().save(*args, **kwargs)
+
+class Favorite(models.Model):
+    """Модель для избранных книг пользователя"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites')
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='favorites')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Избранная книга'
+        verbose_name_plural = 'Избранные книги'
+        unique_together = ('user', 'book')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.book.title}"
