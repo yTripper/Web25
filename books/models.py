@@ -228,15 +228,15 @@ class Book(models.Model):
         try:
             # Создаем HTML-шаблон
             html_string = render_to_string('books/pdf_template.html', {
-                'book': self,
+            'book': self,
                 'reviews': self.reviews.all().select_related('user'),
                 'genres': self.genres.all(),
-            })
-            
+        })
+        
             # Генерируем PDF
             response = HttpResponse(content_type='application/pdf')
             response['Content-Disposition'] = f'attachment; filename="{self.title}.pdf"'
-            
+        
             # Конвертируем HTML в PDF
             HTML(string=html_string).write_pdf(response)
             return response

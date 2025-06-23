@@ -1,11 +1,12 @@
 from django import forms
-from .models import Book, Review, Cover, Order
+from .models import Book, Review, Cover, Order, User
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Submit, Row, Column, Div, HTML
 from crispy_forms.bootstrap import TabHolder, Tab, FormActions
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from typing import Any, Dict
+from django.contrib.auth.forms import UserCreationForm as DjangoUserCreationForm
 
 class BookForm(forms.ModelForm):
     published_at = forms.DateTimeField(
@@ -162,4 +163,9 @@ class OrderForm(forms.ModelForm):
             FormActions(
                 Submit('submit', 'Оформить заказ', css_class='btn btn-primary'),
             )
-        ) 
+        )
+
+class UserRegistrationForm(DjangoUserCreationForm):
+    class Meta:
+        model = User
+        fields = ('username', 'password1', 'password2', 'email', 'first_name', 'last_name') 

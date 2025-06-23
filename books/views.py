@@ -2,13 +2,13 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.http import HttpResponse, JsonResponse, HttpRequest
 from .models import Book, Author, Genre, Review, Cart, CartItem, User, Role, UserRole, BookGenre, Cover, Order, OrderItem, Favorite
-from .forms import BookForm, ReviewForm, OrderForm
+from .forms import BookForm, ReviewForm, OrderForm, UserRegistrationForm
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
 from django.utils import timezone
-from django.db.models import Q, Count, Avg, Sum, Prefetch
+from django.db.models import Q, Count, Avg, Sum, Prefetch, Case, When, Value, CharField, IntegerField
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
@@ -650,24 +650,17 @@ def book_reviews(request: HttpRequest, book_id: int) -> HttpResponse:
 def register(request: HttpRequest) -> HttpResponse:
     """
     Регистрация нового пользователя.
-
-    Args:
-        request (HttpRequest): Объект запроса.
-
-    Returns:
-        HttpResponse: Форма регистрации или редирект на страницу входа.
     """
     if request.method == 'POST':
-        form = UserCreationForm(request.POST)
+        form = UserRegistrationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            # Назначаем роль "Покупатель"
             buyer_role = Role.objects.get(name='Покупатель')
             UserRole.objects.create(user=user, role=buyer_role)
             login(request, user)
             return redirect('books:book-list')
     else:
-        form = UserCreationForm()
+        form = UserRegistrationForm()
     return render(request, 'registration/register.html', {'form': form})
 
 class BookViewSet(viewsets.ModelViewSet):

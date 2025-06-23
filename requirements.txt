@@ -7,4 +7,6 @@ psycopg2-binary==2.9.9
 django-filter==23.5
 djangorestframework==3.14.0
 django-cors-headers==4.3.1
-WeasyPrint==60.1 
+WeasyPrint==60.1
+sentry-sdk==1.44.1
+django-silk==5.4.0 
