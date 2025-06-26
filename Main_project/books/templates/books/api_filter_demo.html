@@ -1,0 +1,231 @@
+{% extends 'base.html' %}
+
+{% block title %}Демонстрация фильтров API{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">🔍 Демонстрация фильтров API</h1>
+            
+            <div class="alert alert-info">
+                <h5>ℹ️ Как использовать фильтры в API</h5>
+                <p>Фильтры работают через URL параметры. Вы можете комбинировать несколько фильтров в одном запросе.</p>
+            </div>
+
+            <!-- Доступные данные -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>📚 Доступные авторы</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                {% for author in authors %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    {{ author.name }}
+                                    <span class="badge bg-primary rounded-pill">ID: {{ author.id }}</span>
+                                </li>
+                                {% empty %}
+                                <li class="list-group-item text-muted">Авторы не найдены</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>🎭 Доступные жанры</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                {% for genre in genres %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    {{ genre.name }}
+                                    <span class="badge bg-success rounded-pill">ID: {{ genre.id }}</span>
+                                </li>
+                                {% empty %}
+                                <li class="list-group-item text-muted">Жанры не найдены</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Примеры фильтров -->
+            <div class="card">
+                <div class="card-header">
+                    <h5>💡 Примеры использования фильтров</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Название фильтра</th>
+                                    <th>URL</th>
+                                    <th>Описание</th>
+                                    <th>Действие</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for example in filter_examples %}
+                                <tr>
+                                    <td><strong>{{ example.name }}</strong></td>
+                                    <td>
+                                        <code class="text-primary">{{ example.url }}</code>
+                                    </td>
+                                    <td>{{ example.description }}</td>
+                                    <td>
+                                        <a href="{{ example.url }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                            🔗 Открыть
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Интерактивный тестер -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5>🧪 Интерактивный тестер фильтров</h5>
+                </div>
+                <div class="card-body">
+                    <form id="filterForm" class="row g-3">
+                        <div class="col-md-6">
+                            <label for="title" class="form-label">Название книги</label>
+                            <input type="text" class="form-control" id="title" name="title" placeholder="Введите название">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="author" class="form-label">Автор</label>
+                            <select class="form-select" id="author" name="author">
+                                <option value="">Выберите автора</option>
+                                {% for author in authors %}
+                                <option value="{{ author.id }}">{{ author.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="min_price" class="form-label">Минимальная цена</label>
+                            <input type="number" class="form-control" id="min_price" name="min_price" placeholder="0">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="max_price" class="form-label">Максимальная цена</label>
+                            <input type="number" class="form-control" id="max_price" name="max_price" placeholder="1000">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="status" class="form-label">Статус</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="">Любой статус</option>
+                                <option value="available">В наличии</option>
+                                <option value="out_of_stock">Нет в наличии</option>
+                                <option value="pre_order">Предзаказ</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="has_discount" class="form-label">Скидка</label>
+                            <select class="form-select" id="has_discount" name="has_discount">
+                                <option value="">Любые книги</option>
+                                <option value="true">Только со скидкой</option>
+                                <option value="false">Без скидки</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">🔍 Применить фильтры</button>
+                            <button type="button" class="btn btn-secondary" onclick="clearFilters()">🗑️ Очистить</button>
+                        </div>
+                    </form>
+                    
+                    <div class="mt-3">
+                        <strong>Сгенерированный URL:</strong>
+                        <div class="alert alert-light">
+                            <code id="generatedUrl">/api/books/</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Документация -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5>📖 Документация по фильтрам</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Доступные фильтры для книг:</h6>
+                    <ul>
+                        <li><code>title</code> - поиск по названию (содержит)</li>
+                        <li><code>author</code> - ID автора</li>
+                        <li><code>genres</code> - ID жанров через запятую (1,2,3)</li>
+                        <li><code>min_price</code> - минимальная цена</li>
+                        <li><code>max_price</code> - максимальная цена</li>
+                        <li><code>status</code> - статус (available, out_of_stock, pre_order)</li>
+                        <li><code>has_discount</code> - наличие скидки (true/false)</li>
+                        <li><code>created_after</code> - дата создания после (YYYY-MM-DD HH:MM:SS)</li>
+                        <li><code>created_before</code> - дата создания до (YYYY-MM-DD HH:MM:SS)</li>
+                        <li><code>price_range</code> - диапазон цен (100,500)</li>
+                        <li><code>rating_min</code> - минимальный рейтинг</li>
+                        <li><code>in_stock</code> - только в наличии (true/false)</li>
+                    </ul>
+                    
+                    <h6>Дополнительные параметры:</h6>
+                    <ul>
+                        <li><code>search</code> - поиск по названию, автору, описанию</li>
+                        <li><code>ordering</code> - сортировка (price, -price, created_at, title)</li>
+                        <li><code>page</code> - номер страницы</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateUrl() {
+    const form = document.getElementById('filterForm');
+    const formData = new FormData(form);
+    const params = new URLSearchParams();
+    
+    for (let [key, value] of formData.entries()) {
+        if (value) {
+            params.append(key, value);
+        }
+    }
+    
+    const url = '/api/books/' + (params.toString() ? '?' + params.toString() : '');
+    document.getElementById('generatedUrl').textContent = url;
+}
+
+function clearFilters() {
+    document.getElementById('filterForm').reset();
+    updateUrl();
+}
+
+// Обновляем URL при изменении полей формы
+document.getElementById('filterForm').addEventListener('change', updateUrl);
+document.getElementById('filterForm').addEventListener('input', updateUrl);
+
+// Обработка отправки формы
+document.getElementById('filterForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const url = document.getElementById('generatedUrl').textContent;
+    window.open(url, '_blank');
+});
+
+// Инициализация
+updateUrl();
+</script>
+{% endblock %} 
